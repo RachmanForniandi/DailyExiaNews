@@ -1,12 +1,18 @@
 package rachmanforniandi.com.dailyexianews;
 
 import android.app.ProgressDialog;
+import android.app.SearchManager;
+import android.content.Context;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.support.v7.widget.SearchView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -34,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView.LayoutManager layoutManager;
     private ProgressDialog loading;
     private String TAG = MainActivity.class.getSimpleName();
-    String country;
+    String country,language;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
 
         country = Utils.getCountry();
+        language =Utils.getLanguage();
+
 
         loading = new ProgressDialog(MainActivity.this);
         apiCommand = ApiCenter.obtainApiClient().create(ApiCommand.class);
@@ -54,13 +62,21 @@ public class MainActivity extends AppCompatActivity {
         listItemNews.setItemAnimator(new DefaultItemAnimator());
         listItemNews.setNestedScrollingEnabled(false);
 
-        loadDataNews();
+        loadDataNews("");
     }
 
-    public void loadDataNews() {
+    public void loadDataNews(String keyWord) {
         //String country = Utils.getCountry();
         loading = ProgressDialog.show(MainActivity.this, null, "Loading...",true,false);
-        apiCommand.getNewsData(country,API_KEY).enqueue(new Callback<News>() {
+        Call<News>call;
+
+        if (keyWord.length()>0){
+            loading.dismiss();
+            call = apiCommand.searchForNews(keyWord,language,"published At",API_KEY);
+        }else {
+            call= apiCommand.getNewsData(country,API_KEY);
+        }
+        call.enqueue(new Callback<News>() {
             @Override
             public void onResponse(Call<News> call, Response<News> response) {
                 Log.e("_logResponse", response.toString() );
@@ -86,4 +102,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_main,menu);
+        SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+
+        final SearchView searchView = (SearchView)menu.findItem(R.id.action_search).getActionView();
+        MenuItem searchMenuItem = menu.findItem(R.id.action_search);
+
+        searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
+        searchView.setQueryHint("Search for the Latest News...");
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (query.length() >2){
+                    loadDataNews(query);
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                loadDataNews(newText);
+                return false;
+            }
+        });
+
+        searchMenuItem.getIcon().setVisible(false,false);
+
+        return true;
+    }
 }
