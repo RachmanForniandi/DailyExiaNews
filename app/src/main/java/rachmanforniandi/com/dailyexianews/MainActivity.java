@@ -3,6 +3,7 @@ package rachmanforniandi.com.dailyexianews;
 import android.app.ProgressDialog;
 import android.app.SearchManager;
 import android.content.Context;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.DefaultItemAnimator;
@@ -13,6 +14,8 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.support.v7.widget.SearchView;
+import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -30,10 +33,13 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
 
     public static final String API_KEY ="7a3c63889ea440b5813ed9b60d974764";
     @BindView(R.id.list_item_news) RecyclerView listItemNews;
+    @BindView(R.id.swipe_reload) SwipeRefreshLayout swipeReload;
+    @BindView(R.id.txt_top_headlines)
+    TextView txtTopHeadlines;
     private List<Article>articles = new ArrayList<>();
     private NewsAdapter newsAdapter;
     private ApiCommand apiCommand;
@@ -55,6 +61,8 @@ public class MainActivity extends AppCompatActivity {
         loading = new ProgressDialog(MainActivity.this);
         apiCommand = ApiCenter.obtainApiClient().create(ApiCommand.class);
         //newsAdapter = new NewsAdapter(articles,MainActivity.this);
+        swipeReload.setOnRefreshListener(MainActivity.this);
+        swipeReload.setColorSchemeResources(R.color.colorAccent);
 
         layoutManager = new LinearLayoutManager(MainActivity.this);
 
@@ -62,12 +70,14 @@ public class MainActivity extends AppCompatActivity {
         listItemNews.setItemAnimator(new DefaultItemAnimator());
         listItemNews.setNestedScrollingEnabled(false);
 
-        loadDataNews("");
+        onLoadingSwipeRefresh("");
     }
 
     public void loadDataNews(String keyWord) {
         //String country = Utils.getCountry();
         loading = ProgressDialog.show(MainActivity.this, null, "Loading...",true,false);
+        txtTopHeadlines.setVisibility(View.INVISIBLE);
+        swipeReload.setRefreshing(true);
         Call<News>call;
 
         if (keyWord.length()>0){
@@ -89,14 +99,20 @@ public class MainActivity extends AppCompatActivity {
                     newsAdapter = new NewsAdapter(articles,MainActivity.this);
                     listItemNews.setAdapter(newsAdapter);
                     newsAdapter.notifyDataSetChanged();
+
+                    txtTopHeadlines.setVisibility(View.VISIBLE);
+                    swipeReload.setRefreshing(false);
                 }else {
+                    txtTopHeadlines.setVisibility(View.INVISIBLE);
+                    swipeReload.setRefreshing(false);
                     Toast.makeText(MainActivity.this, "No news available", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<News> call, Throwable t) {
-
+                txtTopHeadlines.setVisibility(View.INVISIBLE);
+                swipeReload.setRefreshing(false);
             }
         });
     }
@@ -117,14 +133,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 if (query.length() >2){
-                    loadDataNews(query);
+                    onLoadingSwipeRefresh(query);
                 }
                 return false;
             }
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                loadDataNews(newText);
                 return false;
             }
         });
@@ -132,5 +147,19 @@ public class MainActivity extends AppCompatActivity {
         searchMenuItem.getIcon().setVisible(false,false);
 
         return true;
+    }
+
+    @Override
+    public void onRefresh() {
+        loadDataNews("");
+    }
+
+    private void onLoadingSwipeRefresh(final String data){
+        swipeReload.post(new Runnable() {
+            @Override
+            public void run() {
+                loadDataNews(data);
+            }
+        });
     }
 }
